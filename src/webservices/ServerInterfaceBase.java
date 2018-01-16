@@ -22,39 +22,75 @@ public interface ServerInterfaceBase
 	// order
 	//
 
-	void addOrder(List<Product> products) throws RemoteException;
+	/**
+	 * Creates a new order
+	 *
+	 * @param user user that ordered the items
+	 * @param order the order-object
+	 * @return the oid of the order
+	 * @throws RemoteException
+	 */
+	int addOrder(User user, Order order) throws RemoteException;
 
 	void removeOrder(int oid) throws RemoteException;
 
 	Order getOrder(int oid) throws RemoteException;
 
+	/**
+	 * @return a list of all active orders
+	 * @throws RemoteException
+	 */
 	List<Order> listOrders() throws RemoteException;
+
+	/**
+	 *
+	 * @return a list of orders that are pending
+	 * @throws RemoteException
+	 */
+	List<Order> listActiveOrders() throws RemoteException;
 
 	///////////////////////////////////////////////////////////////////////////
 	// product
 	//
 
-	void addProduct(String name, String description, ImageIcon imgBuffer) throws RemoteException;
+	/**
+	 * inserts a new product into the table
+	 *
+	 * @param name
+	 * @param description
+	 * @param imgBuffer
+	 * @param price
+	 * @return product id
+	 * @throws RemoteException
+	 */
+	int addProduct(String name, String description, ImageIcon imgBuffer, double price) throws RemoteException;
 
-	void removeProduct(String name) throws RemoteException;
+	void removeProduct(int pid) throws RemoteException;
 
-	Product getProduct(String name) throws RemoteException;
+	Product getProduct(int pid) throws RemoteException;
 
-	int[] getLocation(String name) throws RemoteException;
+	int[] getLocation(int pid) throws RemoteException;
 
-	void setLocation(String name, int x, int y) throws RemoteException;
+	void setLocation(int pid, int x, int y) throws RemoteException;
 
-	List<String> listProducts() throws RemoteException;
+	List<Product> listProducts() throws RemoteException;
 
 	//////////////////////////////////////////////////////////////////////////
 	// user
 	//
 
-	void addUser(String name) throws RemoteException;
+	/**
+	 * inserts a new user into the table
+	 *
+	 * @param name
+	 * @return user-id
+	 * @throws RemoteException
+	 */
+	int addUser(String name) throws RemoteException;
 
-	void removeUser(String name) throws RemoteException;
+	void removeUser(int uid) throws RemoteException;
 
-	User getUser(String name) throws RemoteException;
+	User getUser(int uid) throws RemoteException;
 
 	//////////////////////////////////////////////////////////////////////////
 	// client based shutdown

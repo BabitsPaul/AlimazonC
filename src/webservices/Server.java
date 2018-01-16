@@ -1,6 +1,7 @@
 package webservices;
 
 import misc.Order;
+import misc.OrderElement;
 import misc.Product;
 import misc.User;
 
@@ -16,8 +17,7 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.*;
 import java.util.List;
 
 public class Server
@@ -34,7 +34,7 @@ public class Server
 
 	private Connection con;
 
-	private PreparedStatement addOrder, removeOrder, listOrders, getOrder,
+	private PreparedStatement addOrder, addOrderProd, removeOrder, listOrders, getOrder, listActiveOrders,
 								addProduct, removeProduct, getProduct, listProducts,
 								getLocation, setLocation,
 								addUser, removeUser,  getUser;
@@ -86,19 +86,21 @@ public class Server
 		throws SQLException
 	{
 		con = DriverManager.getConnection(SERVER_ACC, DB_USER, USER_PW);
-		addOrder = con.prepareStatement("INSERT INTO orders (list) VALUES (?)");
+		addOrder = con.prepareStatement("INSERT INTO orders (uid) VALUES (?)");
+		addOrderProd = con.prepareStatement("INSERT INTO orderls (oid, pid, ct) VALUES (?, ?, ?)");
 		removeOrder = con.prepareStatement("DELETE FROM orders WHERE id=?");
-		listOrders = con.prepareStatement("SELECT * FROM product");
-		getOrder = con.prepareStatement("SELECT list FROM orders WHERE id=?");
-		addProduct = con.prepareStatement("INSERT INTO product (name, description, iconFile) VALUES (?, ?, ?)");
-		removeProduct = con.prepareStatement("DELETE FROM product WHERE name=?");
-		getProduct = con.prepareStatement("SELECT * FROM product WHERE name=?");
+		listOrders = con.prepareStatement("SELECT orderls.oid, orderls.count, product.* FROM orderls INNERJOIN product ON orderls.pid = product.pid");
+		listActiveOrders = con.prepareStatement("SELECT orderls.oid, orderls.count, product.* FROM orderls INNERJOIN product ON orderls.pid = product.pid WHERE orders.status = 'pending'");
+		getOrder = con.prepareStatement("SELECT orderls.count, product.* FROM orderls INNERJOIN product ON orderls.pid = product.pid WHERE orderls.oid=?");
+		addProduct = con.prepareStatement("INSERT INTO product (name, description, iconFile, price) VALUES (?, ?, ?, ?)");
+		removeProduct = con.prepareStatement("DELETE FROM product WHERE pid=?");
+		getProduct = con.prepareStatement("SELECT * FROM product WHERE pid=?");
 		listProducts = con.prepareStatement("SELECT * FROM product");
-		getLocation = con.prepareStatement("SELECT xcoord, ycoord FROM product WHERE name=?");
-		setLocation = con.prepareStatement("INSERT INTO location (name, xcoord, ycoord) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE xcoord=?, ycoord=?");
+		getLocation = con.prepareStatement("SELECT xcoord, ycoord FROM location WHERE pid=?");
+		setLocation = con.prepareStatement("INSERT INTO location (pid, xcoord, ycoord) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE xcoord=?, ycoord=?");
 		addUser = con.prepareStatement("INSERT INTO user (name) VALUES (?)");
-		removeUser = con.prepareStatement("DELETE FROM user WHERE name=?");
-		getUser = con.prepareStatement("SELECT * FROM user WHERE name=?");
+		removeUser = con.prepareStatement("DELETE FROM user WHERE uid=?");
+		getUser = con.prepareStatement("SELECT * FROM user WHERE uid=?");
 	}
 
 	private void initIMG()
@@ -122,16 +124,24 @@ public class Server
 	}
 
 	@Override
-	public void addOrder(List<Product> products)
+	public int addOrder(User user, Order order)
 		throws RemoteException
 	{
 		try{
-			addOrder.setString(1, products.stream().collect(
-					StringBuilder::new,
-					(sb, s)-> sb.append(", \"").append(s).append("\""),
-					(a, b)->a.append(b)).
-					toString());
+			addOrder.setInt(1, (int) user.getUid());
 			addOrder.execute();
+
+			int oid = addOrder.getGeneratedKeys().getInt(1);
+
+			for(int i = 0; i < order.size(); i++)
+			{
+				addOrderProd.setInt(1, oid);
+				addOrderProd.setInt(2, order.get(i).product.getPid());
+				addOrderProd.setInt(3, order.get(i).count);
+				addOrderProd.execute();
+			}
+
+			return oid;
 		}catch (SQLException e)
 		{
 			throw new RemoteException("Failed to add order", e);
@@ -153,11 +163,25 @@ public class Server
 	public Order getOrder(int oid) throws RemoteException
 	{
 		try {
-			getOrder.setInt(1, oid);
+			Order o = new Order();
 
+			getOrder.setInt(1, oid);
 			ResultSet res = getOrder.executeQuery();
 
-			return null;
+			while(res.next())
+			{
+				try {
+					Product p = new Product(res.getInt(2), res.getString(3), res.getString(4),
+							new ImageIcon(ImageIO.read(new File(res.getString(5)))), res.getDouble(6));
+
+					o.addOderElement(new OrderElement(p, res.getInt(1)));
+				}catch (IOException e)
+				{
+					throw new RemoteException("Failed to retrieve product icon", e);
+				}
+			}
+
+			return o;
 		}catch (SQLException e)
 		{
 			throw new RemoteException("Failed to retrieve order", e);
@@ -168,13 +192,72 @@ public class Server
 	public List<Order> listOrders()
 		throws RemoteException
 	{
-		// TODO storage of orders
+		try {
+			Map<Integer, Order> orders = new HashMap<>();
 
-		return null;
+			// SELECT orderls.oid, orderls.count, product.* FROM orderls INNERJOIN product ON orderls.pid = product.pid
+			ResultSet res = listOrders.executeQuery();
+
+			while(res.next())
+			{
+				try {
+					Product p = new Product(res.getInt(3), res.getString(4), res.getString(5),
+							new ImageIcon(ImageIO.read(new File(res.getString(6)))), res.getDouble(7));
+
+					if(orders.get(res.getInt(1)) == null)
+					{
+						orders.put(res.getInt(1), new Order());
+					}
+
+					orders.get(res.getInt(1)).addOderElement(new OrderElement(p, res.getInt(2)));
+				}catch (IOException e)
+				{
+					throw new RemoteException("Failed to retrieve product icon", e);
+				}
+			}
+
+			return new ArrayList<>(orders.values());
+		}catch (SQLException e)
+		{
+			throw new RemoteException("Failed to retrieve orders", e);
+		}
 	}
 
 	@Override
-	public void addProduct(String name, String description, ImageIcon img)
+	public List<Order> listActiveOrders() throws RemoteException {
+		try {
+			Map<Integer, Order> orders = new HashMap<>();
+
+			// SELECT orderls.oid, orderls.count, product.* FROM orderls INNERJOIN product ON orderls.pid = product.pid
+			ResultSet res = listActiveOrders.executeQuery();
+
+			while(res.next())
+			{
+				try {
+					Product p = new Product(res.getInt(3), res.getString(4), res.getString(5),
+							new ImageIcon(ImageIO.read(new File(res.getString(6)))), res.getDouble(7));
+
+					if(orders.get(res.getInt(1)) == null)
+					{
+						orders.put(res.getInt(1), new Order());
+					}
+
+					orders.get(res.getInt(1)).addOderElement(new OrderElement(p, res.getInt(2)));
+				}catch (IOException e)
+				{
+					throw new RemoteException("Failed to retrieve product icon", e);
+				}
+			}
+
+			return new ArrayList<>(orders.values());
+		}catch (SQLException e)
+		{
+			throw new RemoteException("Failed to retrieve orders", e);
+		}
+	}
+
+	@Override
+	public int addProduct(String name, String description, ImageIcon img, double price)
 		throws RemoteException
 	{
 		String fn = IMAGE_FOLDER + "/" + nextAvailableFile;
@@ -197,7 +280,10 @@ public class Server
 			addProduct.setString(1, name);
 			addProduct.setString(2, description);
 			addProduct.setString(3, IMAGE_FOLDER + "/" + nextAvailableFile);
+			addProduct.setDouble(4, price);
 			addProduct.execute();
+
+			return addProduct.getGeneratedKeys().getInt(1);
 		}catch (SQLException e)
 		{
 			throw new RemoteException("Failed to write product to database", e);
@@ -205,9 +291,9 @@ public class Server
 	}
 
 	@Override
-	public void removeProduct(String name) throws RemoteException {
+	public void removeProduct(int pid) throws RemoteException {
 		try {
-			removeProduct.setString(1, name);
+			removeProduct.setInt(1, pid);
 			removeProduct.execute();
 		}catch (SQLException e)
 		{
@@ -216,13 +302,13 @@ public class Server
 	}
 
 	@Override
-	public Product getProduct(String name) throws RemoteException {
+	public Product getProduct(int pid) throws RemoteException {
 		try {
-			getProduct.setString(1, name);
+			getProduct.setInt(1, pid);
 			ResultSet res = getProduct.executeQuery();
 
-			return new Product(res.getString(1), res.getString(2),
-					new ImageIcon(ImageIO.read(new File(res.getString(3)))));
+			return new Product(res.getInt(1), res.getString(2), res.getString(3),
+					new ImageIcon(ImageIO.read(new File(res.getString(4)))), res.getDouble(5));
 		}catch (SQLException | IOException e)
 		{
 			throw new RemoteException("Failed to read product", e);
@@ -230,17 +316,23 @@ public class Server
 	}
 
 	@Override
-	public List<String> listProducts()
+	public List<Product> listProducts()
 		throws RemoteException
 	{
 		try{
 			ResultSet res = listProducts.executeQuery();
 
-			List<String> prodList = new ArrayList<>();
+			List<Product> prodList = new ArrayList<>();
 
 			while(res.next())
 			{
-				prodList.add(res.getString(1));
+				try {
+					prodList.add(new Product(res.getInt(1), res.getString(2), res.getString(3),
+							new ImageIcon(ImageIO.read(new File(res.getString(4)))), res.getDouble(5)));
+				}catch (IOException e)
+				{
+					throw new RemoteException("Failed to load icon for product", e);
+				}
 			}
 
 			return prodList;
@@ -251,9 +343,9 @@ public class Server
 	}
 
 	@Override
-	public int[] getLocation(String name) throws RemoteException {
+	public int[] getLocation(int pid) throws RemoteException {
 		try {
-			getLocation.setString(1, name);
+			getLocation.setInt(1, pid);
 			ResultSet res = getLocation.executeQuery();
 
 			return new int[]{res.getInt(1), res.getInt(2)};
@@ -264,10 +356,10 @@ public class Server
 	}
 
 	@Override
-	public void setLocation(String name, int x, int y) throws RemoteException
+	public void setLocation(int pid, int x, int y) throws RemoteException
 	{
 		try {
-			setLocation.setString(1, name);
+			setLocation.setInt(1, pid);
 			setLocation.setInt(2, x);
 			setLocation.setInt(3, y);
 			setLocation.setInt(4, x);
@@ -280,10 +372,12 @@ public class Server
 	}
 
 	@Override
-	public void addUser(String name) throws RemoteException {
+	public int addUser(String name) throws RemoteException {
 		try {
 			addUser.setString(1, name);
 			addUser.execute();
+
+			return addUser.getGeneratedKeys().getInt(1);
 		}catch (SQLException e)
 		{
 			throw new RemoteException("Failed to insert user", e);
@@ -291,9 +385,9 @@ public class Server
 	}
 
 	@Override
-	public void removeUser(String name) throws RemoteException {
+	public void removeUser(int uid) throws RemoteException {
 		try {
-			removeUser.setString(1, name);
+			removeUser.setInt(1, uid);
 			removeUser.execute();
 		}catch (SQLException e)
 		{
@@ -302,9 +396,9 @@ public class Server
 	}
 
 	@Override
-	public User getUser(String name) throws RemoteException {
+	public User getUser(int uid) throws RemoteException {
 		try {
-			getUser.setString(1, name);
+			getUser.setInt(1, uid);
 			ResultSet res = getUser.executeQuery();
 
 			return new User(res.getString(2), res.getInt(1));

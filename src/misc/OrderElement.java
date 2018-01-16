@@ -11,7 +11,10 @@ public class OrderElement
 		this.count = count;
 		this.done = false;
 	}
+
 	public Product product;
+
 	public int count;
+
 	public boolean done;
 }

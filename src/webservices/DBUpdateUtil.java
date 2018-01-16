@@ -73,12 +73,16 @@ public class DBUpdateUtil {
 			{
 				int idxEndProdName = str.indexOf('\"', 1);
 				int idxEndDescription = str.indexOf('\"', idxEndProdName + 3);
+				int idxEndImage = str.indexOf(' ', idxEndDescription + 2);
 
 				String prodName = str.substring(1, idxEndProdName);
 				String description = str.substring(idxEndProdName + 3, idxEndDescription);
-				String iconStr = str.substring(idxEndDescription + 2);
+				String iconStr = str.substring(idxEndDescription + 2, idxEndImage);
 
-				base.addProduct(prodName, description, new ImageIcon(ImageIO.read(new File(iconStr))));
+				int i = base.addProduct(prodName, description, new ImageIcon(ImageIO.read(new File(iconStr))),
+						Double.parseDouble(str.substring(idxEndImage)));
+
+				System.out.println(prodName + " with pid: " + i);
 			}
 		}catch (IOException e)
 		{
@@ -95,12 +99,12 @@ public class DBUpdateUtil {
 
 			while((str = br.readLine()) != null)
 			{
-				int idxEndProdName = str.indexOf('\"', 1);
-				String prodName = str.substring(1, idxEndProdName);
+				int idxEndPid = str.indexOf(' ', 1);
+				String prodName = str.substring(1, idxEndPid);
 
-				String[] location = str.substring(idxEndProdName + 2).split(" ");
+				String[] location = str.substring(idxEndPid + 2).split(" ");
 
-				base.setLocation(prodName, Integer.parseInt(location[0]), Integer.parseInt(location[1]));
+				base.setLocation(Integer.parseInt(prodName), Integer.parseInt(location[0]), Integer.parseInt(location[1]));
 			}
 		}catch (IOException e)
 		{

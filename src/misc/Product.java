@@ -7,16 +7,22 @@ import java.io.Serializable;
 public class Product
 	implements Serializable
 {
+	private int pid;
+
 	private ImageIcon img;
 
 	private String name;
 
 	private String description;
 
-	public Product(String name, String description, ImageIcon icon) {
+	private double price;
+
+	public Product(int pid, String name, String description, ImageIcon icon, double price) {
 		this.name = name;
 		this.description = description;
 		this.img = icon;
+		this.pid = pid;
+		this.price = price;
 	}
 
 	public ImageIcon getImg() {
@@ -29,5 +35,13 @@ public class Product
 
 	public String getDescription() {
 		return description;
+	}
+
+	public int getPid() {
+		return pid;
+	}
+
+	public double getPrice() {
+		return price;
 	}
 }

@@ -43,10 +43,12 @@ public class Order
 
 		
 	}
+
 	public OrderElement get(int i)
 	{
 		return orderElementList.get(i);
 	}
+
 	public void switchState(int i)
 	{
 		OrderElement o=orderElementList.get(i);
@@ -61,6 +63,7 @@ public class Order
 			orderElementList.add(0,o);
 		}
 	}
+
 	public int size()
 	{
 		return orderElementList.size();
