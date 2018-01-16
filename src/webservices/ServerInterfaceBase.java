@@ -16,6 +16,8 @@ public interface ServerInterfaceBase
 
 	String REGISTRY_NAME = "databaseif";
 
+	String HOST = "192.168.56.103";
+
 	//////////////////////////////////////////////////////////////////////////
 	// order
 	//

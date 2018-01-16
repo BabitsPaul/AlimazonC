@@ -5,14 +5,16 @@ import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 
+import static webservices.ServerInterfaceBase.HOST;
+
 public class ClientInterface
 {
-	private static final String HOST = "192.168.56.103";
-
 	private ServerInterfaceBase base;
 
 	public void init()
 	{
+		System.setProperty("java.rmi.server.hostname", HOST);
+
 		try {
 			Registry registry = LocateRegistry.getRegistry(HOST, ServerInterfaceBase.RMI_PORT);
 			base = (ServerInterfaceBase) registry.lookup(ServerInterfaceBase.REGISTRY_NAME);
@@ -29,5 +31,9 @@ public class ClientInterface
 			e.printStackTrace();
 			System.exit(1);	// TODO don't terminate!!!
 		}
+	}
+
+	public ServerInterfaceBase getBase() {
+		return base;
 	}
 }

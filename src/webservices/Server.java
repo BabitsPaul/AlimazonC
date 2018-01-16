@@ -49,6 +49,8 @@ public class Server
 
 	public static void main(String[] args)
 	{
+		System.setProperty("java.rmi.server.hostname", HOST);
+
 		try {
 			Server sif = new Server();
 			sif.initRMI();
