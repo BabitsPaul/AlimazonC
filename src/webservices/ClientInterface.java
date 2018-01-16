@@ -9,9 +9,9 @@ import static webservices.ServerInterfaceBase.HOST;
 
 public class ClientInterface
 {
-	private ServerInterfaceBase base;
+	private static ServerInterfaceBase base;
 
-	public void init()
+	public static void init()
 	{
 		System.setProperty("java.rmi.server.hostname", HOST);
 
@@ -33,7 +33,7 @@ public class ClientInterface
 		}
 	}
 
-	public ServerInterfaceBase getBase() {
+	public static ServerInterfaceBase getBase() {
 		return base;
 	}
 }

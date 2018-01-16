@@ -1,5 +1,9 @@
 package webservices;
 
+import misc.Order;
+import misc.OrderElement;
+import misc.User;
+
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.io.BufferedReader;
@@ -14,9 +18,8 @@ public class DBUpdateUtil {
 	public static void main(String[] args)
 		throws IOException
 	{
-		ClientInterface ifc = new ClientInterface();
-		ifc.init();
-		base = ifc.getBase();
+		ClientInterface.init();
+		base = ClientInterface.getBase();
 
 		if(args.length > 0 && args[0].equals("shutdown"))
 		{
@@ -29,7 +32,7 @@ public class DBUpdateUtil {
 		{
 			System.out.println("Error: Too few parameters");
 			System.out.println("Usage: <type> <file>");
-			System.out.println("	Where <type> is one of <user>, <product> or <location>");
+			System.out.println("	Where <type> is one of <user>, <product>, <order> or <location>");
 			System.out.println("	and <file> specifies the input-file");
 			System.exit(1);
 		}
@@ -39,6 +42,7 @@ public class DBUpdateUtil {
 			case "user": 	addUsers(args[1]); 		break;
 			case "product": addProducts(args[1]);	break;
 			case "location":addLocations(args[1]);	break;
+			case "order":	addOrders(args[1]);		break;
 			default:		System.err.println("Invalid type: " + args[0]);
 							System.exit(1);	break;
 		}
@@ -53,7 +57,7 @@ public class DBUpdateUtil {
 
 			while((str = br.readLine()) != null)
 			{
-				base.addUser(str);
+				System.out.println("User " + str + " with UID: " + base.addUser(str));
 			}
 		}catch (IOException e)
 		{
@@ -99,12 +103,37 @@ public class DBUpdateUtil {
 
 			while((str = br.readLine()) != null)
 			{
-				int idxEndPid = str.indexOf(' ', 1);
-				String prodName = str.substring(1, idxEndPid);
+				String[] s = str.split(" ");
 
-				String[] location = str.substring(idxEndPid + 2).split(" ");
+				base.setLocation(Integer.parseInt(s[0]), Integer.parseInt(s[1]), Integer.parseInt(s[2]));
+			}
+		}catch (IOException e)
+		{
+			e.printStackTrace();
+			System.exit(1);
+		}
+	}
 
-				base.setLocation(Integer.parseInt(prodName), Integer.parseInt(location[0]), Integer.parseInt(location[1]));
+	private static void addOrders(String fn)
+	{
+		try(BufferedReader br = new BufferedReader(new FileReader(fn)))
+		{
+
+			String str;
+
+			while((str = br.readLine()) != null)
+			{
+				String[] s = str.split(" ");
+
+				User u = base.getUser(Integer.parseInt(s[0]));
+				Order o = new Order();
+
+				for(int i = 1; i < s.length; i += 2)
+				{
+					o.addOderElement(new OrderElement(base.getProduct(Integer.parseInt(s[i])), Integer.parseInt(s[i + 1])));
+				}
+
+				base.addOrder(u, o);
 			}
 		}catch (IOException e)
 		{

@@ -1,2 +1,2 @@
-"Pencil Sharpener" "Sharpens pencils like a charm" not/a/real/path.jpg
-"Football" "Kick it like... I forgot the name" neither/a/real/path.jpg
+"Pencil Sharpener" "Sharpens pencils like a charm" /home/noone/Pictures/ace_of_spades.jpg 5.59
+"Football" "Kick it like... I forgot the name" /home/noone/Pictures/ace_of_spades.jpg 19.99

@@ -12,6 +12,7 @@ import java.awt.image.BufferedImage;
 import java.io.*;
 import java.rmi.AlreadyBoundException;
 import java.rmi.NotBoundException;
+import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
@@ -86,21 +87,21 @@ public class Server
 		throws SQLException
 	{
 		con = DriverManager.getConnection(SERVER_ACC, DB_USER, USER_PW);
-		addOrder = con.prepareStatement("INSERT INTO orders (uid) VALUES (?)");
-		addOrderProd = con.prepareStatement("INSERT INTO orderls (oid, pid, ct) VALUES (?, ?, ?)");
-		removeOrder = con.prepareStatement("DELETE FROM orders WHERE id=?");
-		listOrders = con.prepareStatement("SELECT orderls.oid, orderls.count, product.* FROM orderls INNERJOIN product ON orderls.pid = product.pid");
-		listActiveOrders = con.prepareStatement("SELECT orderls.oid, orderls.count, product.* FROM orderls INNERJOIN product ON orderls.pid = product.pid WHERE orders.status = 'pending'");
-		getOrder = con.prepareStatement("SELECT orderls.count, product.* FROM orderls INNERJOIN product ON orderls.pid = product.pid WHERE orderls.oid=?");
-		addProduct = con.prepareStatement("INSERT INTO product (name, description, iconFile, price) VALUES (?, ?, ?, ?)");
-		removeProduct = con.prepareStatement("DELETE FROM product WHERE pid=?");
-		getProduct = con.prepareStatement("SELECT * FROM product WHERE pid=?");
-		listProducts = con.prepareStatement("SELECT * FROM product");
-		getLocation = con.prepareStatement("SELECT xcoord, ycoord FROM location WHERE pid=?");
-		setLocation = con.prepareStatement("INSERT INTO location (pid, xcoord, ycoord) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE xcoord=?, ycoord=?");
-		addUser = con.prepareStatement("INSERT INTO user (name) VALUES (?)");
-		removeUser = con.prepareStatement("DELETE FROM user WHERE uid=?");
-		getUser = con.prepareStatement("SELECT * FROM user WHERE uid=?");
+		addOrder = con.prepareStatement("INSERT INTO orders (uid) VALUES (?)", Statement.RETURN_GENERATED_KEYS);
+		addOrderProd = con.prepareStatement("INSERT INTO orderls (oid, pid, ct) VALUES (?, ?, ?)", Statement.RETURN_GENERATED_KEYS);
+		removeOrder = con.prepareStatement("DELETE FROM orders WHERE id=?", Statement.RETURN_GENERATED_KEYS);
+		listOrders = con.prepareStatement("SELECT orderls.oid, orderls.ct, product.* FROM orderls INNER JOIN product ON orderls.pid = product.pid", Statement.RETURN_GENERATED_KEYS);
+		listActiveOrders = con.prepareStatement("SELECT orderls.oid, orderls.ct, product.* FROM orderls INNER JOIN product ON orderls.pid = product.pid INNER JOIN orders ON orderls.oid = orders.oid WHERE orders.status = 'pending'", Statement.RETURN_GENERATED_KEYS);
+		getOrder = con.prepareStatement("SELECT orderls.ct, product.* FROM orderls INNER JOIN product ON orderls.pid = product.pid WHERE orderls.oid=?", Statement.RETURN_GENERATED_KEYS);
+		addProduct = con.prepareStatement("INSERT INTO product (name, description, iconFile, price) VALUES (?, ?, ?, ?)", Statement.RETURN_GENERATED_KEYS);
+		removeProduct = con.prepareStatement("DELETE FROM product WHERE pid=?", Statement.RETURN_GENERATED_KEYS);
+		getProduct = con.prepareStatement("SELECT * FROM product WHERE pid=?", Statement.RETURN_GENERATED_KEYS);
+		listProducts = con.prepareStatement("SELECT * FROM product", Statement.RETURN_GENERATED_KEYS);
+		getLocation = con.prepareStatement("SELECT xcoord, ycoord FROM location WHERE pid=?", Statement.RETURN_GENERATED_KEYS);
+		setLocation = con.prepareStatement("INSERT INTO location (pid, xcoord, ycoord) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE xcoord=?, ycoord=?", Statement.RETURN_GENERATED_KEYS);
+		addUser = con.prepareStatement("INSERT INTO user (name) VALUES (?)", Statement.RETURN_GENERATED_KEYS);
+		removeUser = con.prepareStatement("DELETE FROM user WHERE uid=?", Statement.RETURN_GENERATED_KEYS);
+		getUser = con.prepareStatement("SELECT * FROM user WHERE uid=?", Statement.RETURN_GENERATED_KEYS);
 	}
 
 	private void initIMG()
@@ -119,7 +120,8 @@ public class Server
 		}
 		else
 		{
-			nextAvailableFile = Arrays.stream(folder.list()).mapToInt(Integer::parseInt).max().orElse(-1) + 1;
+			nextAvailableFile = Arrays.stream(folder.list()).map(s -> s.substring(0, s.indexOf('.'))).
+					mapToInt(Integer::parseInt).max().orElse(-1) + 1;
 		}
 	}
 
@@ -128,10 +130,16 @@ public class Server
 		throws RemoteException
 	{
 		try{
+			int oid;
+
 			addOrder.setInt(1, (int) user.getUid());
 			addOrder.execute();
 
-			int oid = addOrder.getGeneratedKeys().getInt(1);
+			ResultSet res = addOrder.getGeneratedKeys();
+			if(res.next())
+				oid = res.getInt(1);
+			else
+				throw new RemoteException("Failed to retrieve OID");
 
 			for(int i = 0; i < order.size(); i++)
 			{
@@ -260,7 +268,7 @@ public class Server
 	public int addProduct(String name, String description, ImageIcon img, double price)
 		throws RemoteException
 	{
-		String fn = IMAGE_FOLDER + "/" + nextAvailableFile;
+		String fn = IMAGE_FOLDER + "/" + nextAvailableFile + ".png";
 		nextAvailableFile++;
 
 		try {
@@ -270,7 +278,7 @@ public class Server
 			g2.drawImage(i, 0, 0,i.getWidth(null),i.getHeight(null), null);
 			g2.dispose();
 
-			ImageIO.write(bi, "jpg", new FileOutputStream(new File(fn)));
+			ImageIO.write(bi, "png", new FileOutputStream(new File(fn)));
 		}catch (IOException e)
 		{
 			throw new RemoteException("Failed to store image", e);
@@ -279,11 +287,16 @@ public class Server
 		try {
 			addProduct.setString(1, name);
 			addProduct.setString(2, description);
-			addProduct.setString(3, IMAGE_FOLDER + "/" + nextAvailableFile);
+			addProduct.setString(3, fn);
 			addProduct.setDouble(4, price);
 			addProduct.execute();
 
-			return addProduct.getGeneratedKeys().getInt(1);
+			ResultSet res = addProduct.getGeneratedKeys();
+
+			if(res.next())
+				return res.getInt(1);
+			else
+				throw new RemoteException("Failed to retrieve PID");
 		}catch (SQLException e)
 		{
 			throw new RemoteException("Failed to write product to database", e);
@@ -306,6 +319,9 @@ public class Server
 		try {
 			getProduct.setInt(1, pid);
 			ResultSet res = getProduct.executeQuery();
+
+			if(!res.next())
+				throw new RemoteException("No such Product");
 
 			return new Product(res.getInt(1), res.getString(2), res.getString(3),
 					new ImageIcon(ImageIO.read(new File(res.getString(4)))), res.getDouble(5));
@@ -348,6 +364,9 @@ public class Server
 			getLocation.setInt(1, pid);
 			ResultSet res = getLocation.executeQuery();
 
+			if(!res.next())
+				throw new RemoteException("Entry not found");
+
 			return new int[]{res.getInt(1), res.getInt(2)};
 		}catch (SQLException e)
 		{
@@ -377,7 +396,12 @@ public class Server
 			addUser.setString(1, name);
 			addUser.execute();
 
-			return addUser.getGeneratedKeys().getInt(1);
+			ResultSet res = addUser.getGeneratedKeys();
+
+			if(res.next())
+				return res.getInt(1);
+			else
+				throw new RemoteException("Failed to retrieve UID");
 		}catch (SQLException e)
 		{
 			throw new RemoteException("Failed to insert user", e);
@@ -400,6 +424,9 @@ public class Server
 		try {
 			getUser.setInt(1, uid);
 			ResultSet res = getUser.executeQuery();
+
+			if(!res.next())
+				throw new RemoteException("No such user");
 
 			return new User(res.getString(2), res.getInt(1));
 		}catch (SQLException e)
