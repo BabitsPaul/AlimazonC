@@ -1,10 +1,33 @@
 package misc;
 
-/**
- * Holds all data for a product, like name, description,
- * price and whether express-delivery is possible.
- *
- * Location of the product in the warehouse
- */
-public class Product {
+import javax.swing.*;
+import java.awt.*;
+import java.io.Serializable;
+
+public class Product
+	implements Serializable
+{
+	private ImageIcon img;
+
+	private String name;
+
+	private String description;
+
+	public Product(String name, String description, ImageIcon icon) {
+		this.name = name;
+		this.description = description;
+		this.img = icon;
+	}
+
+	public ImageIcon getImg() {
+		return img;
+	}
+
+	public String getName() {
+		return name;
+	}
+
+	public String getDescription() {
+		return description;
+	}
 }

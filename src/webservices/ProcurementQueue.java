@@ -2,6 +2,8 @@ package webservices;
 
 import misc.AIReport;
 
+import java.rmi.RemoteException;
+
 public interface ProcurementQueue
 {
 	/**
@@ -9,5 +11,7 @@ public interface ProcurementQueue
 	 *
 	 * @param r
 	 */
-	void report(AIReport r);
+	void report(AIReport r) throws RemoteException;
+
+	AIReport retrieve() throws RemoteException, InterruptedException;
 }
