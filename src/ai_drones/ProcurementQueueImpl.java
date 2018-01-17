@@ -50,8 +50,8 @@ public class ProcurementQueueImpl
 		}
 
 		try {
-			getInstance().report(new AIReport());
-			getInstance().report(new AIReport());
+			getInstance().report(new AIReport(null, null));
+			getInstance().report(new AIReport(null, null));
 		}catch (Exception e)
 		{
 			e.printStackTrace();

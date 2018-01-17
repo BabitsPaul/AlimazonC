@@ -3,40 +3,31 @@ package ai_drones;
 import webservices.ClientInterface;
 import webservices.ServerInterfaceBase;
 import weka.classifiers.functions.LinearRegression;
-import weka.classifiers.trees.m5.PreConstructedLinearModel;
 import weka.core.Attribute;
 import weka.core.DenseInstance;
 import weka.core.Instances;
 
+import java.rmi.Remote;
 import java.rmi.RemoteException;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
+import java.rmi.server.UnicastRemoteObject;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
 public class Regression
 {
-	public static void main(String[] args)
-		throws Exception
-	{
-		Regression r = new Regression();
-		r.init();
-		r.loadData();
-	}
-
 	private ServerInterfaceBase si;
 
 	private Map<Integer, Map<Date, Integer>> sales;
 
-	public Regression()
+	private Map<Integer, Instances> data;
+
+	public Regression(ServerInterfaceBase si)
 	{
 		sales = new HashMap<>();
-	}
-
-	public void init()
-		throws RemoteException
-	{
-		ClientInterface.init();
-		si = ClientInterface.getBase();
+		this.si = si;
 	}
 
 	/**
@@ -45,11 +36,14 @@ public class Regression
 	public void loadData()
 		throws RemoteException
 	{
-		Map<Date, Map<Integer, Integer>> sales = si.listSalesByDate();
+		data = new HashMap<>();
+		this.sales = new HashMap<>();
 
-		for(Date d : sales.keySet())
+		Map<Date, Map<Integer, Integer>> salesPerDate = si.listSalesByDate();
+
+		for(Date d : salesPerDate.keySet())
 		{
-			Map<Integer, Integer> dailySales = sales.get(d);
+			Map<Integer, Integer> dailySales = salesPerDate.get(d);
 
 			for(int pid : dailySales.keySet())
 			{
@@ -64,39 +58,51 @@ public class Regression
 				m.put(d, dailySales.get(pid));
 			}
 		}
-
-		System.out.println(sales);
 	}
 
 	public LinearRegression genLinearRegression(int pid)
 		throws Exception
 	{
-		Attribute dateAttr = new Attribute("date", new SimpleDateFormat().toLocalizedPattern());
-		Attribute countAttr = new Attribute("sold");
+		Instances inst;
 
-		ArrayList<Attribute> attributes = new ArrayList<>();
-		attributes.add(dateAttr);	// date-attribute
-		attributes.add(countAttr);	// numeric attribute
-
-		Instances inst = new Instances("linear reg - " + pid, attributes, sales.get(pid).size());
-		Map<Date, Integer> sold = sales.get(pid);
-		DateFormat df = new SimpleDateFormat();
-		for(Date d : sold.keySet())
+		if(data.containsKey(pid))
 		{
-			DenseInstance denseInstance = new DenseInstance(attributes.size());
-			denseInstance.setValue(dateAttr, df.format(d));
-			denseInstance.setValue(countAttr, sold.get(d));
-			inst.add(denseInstance);
+			inst = data.get(pid);
 		}
+		else {
+			Attribute dateAttr = new Attribute("date", new SimpleDateFormat().toLocalizedPattern());
+			Attribute countAttr = new Attribute("sold");
 
-		// build a linear regression for the training data using the
-		// tested attributes
+			ArrayList<Attribute> attributes = new ArrayList<>();
+			attributes.add(dateAttr);    // date-attribute
+			attributes.add(countAttr);    // numeric attribute
 
-		LinearRegression reg = new LinearRegression();
+			inst = new Instances("linear reg - " + pid, attributes, sales.get(pid).size());
+			Map<Date, Integer> sold = sales.get(pid);
+			DateFormat df = new SimpleDateFormat();
+			for (Date d : sold.keySet()) {
+				DenseInstance denseInstance = new DenseInstance(attributes.size());
+				denseInstance.setValue(dateAttr, df.format(d));
+				denseInstance.setValue(countAttr, sold.get(d));
+				inst.add(denseInstance);
+			}
+
+			inst.setClass(countAttr);
+		}
 
 		LinearRegression temp = new LinearRegression();
 		temp.buildClassifier(inst);
 
 		return temp;
+	}
+
+	public Set<Integer> listAvailableProductIDs()
+	{
+		return sales.keySet();
+	}
+
+	public Map<Date, Integer> getProductSales(int pid)
+	{
+		return sales.get(pid);
 	}
 }

@@ -9,4 +9,24 @@ import java.io.Serializable;
 public class AIReport
 	implements Serializable
 {
+	private Product product;
+
+	/**
+	 * Expected sales per week
+	 */
+	private int[] expectedSales;
+
+	public AIReport(Product product, int[] expectedSales)
+	{
+		this.product = product;
+		this.expectedSales = expectedSales;
+	}
+
+	public Product getProduct() {
+		return product;
+	}
+
+	public int[] getExpectedSales() {
+		return expectedSales;
+	}
 }
