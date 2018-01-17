@@ -22,8 +22,7 @@ public interface Database
 
 	/**
 	 * List of failed requests.
-	 *
-	 * @param sqlrequest
+	 *	 * @param sqlrequest
 	 * @return
 	 */
 	List<Request> failedRequests(String sqlrequest);

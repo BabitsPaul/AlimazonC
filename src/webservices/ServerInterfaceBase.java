@@ -7,7 +7,9 @@ import misc.User;
 import javax.swing.*;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
+import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 public interface ServerInterfaceBase
 	extends Remote
@@ -48,6 +50,8 @@ public interface ServerInterfaceBase
 	 * @throws RemoteException
 	 */
 	List<Order> listActiveOrders() throws RemoteException;
+
+	Map<Date, Map<Integer, Integer>> listSalesByDate() throws RemoteException;
 
 	///////////////////////////////////////////////////////////////////////////
 	// product

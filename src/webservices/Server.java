@@ -12,13 +12,13 @@ import java.awt.image.BufferedImage;
 import java.io.*;
 import java.rmi.AlreadyBoundException;
 import java.rmi.NotBoundException;
-import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 import java.sql.*;
 import java.util.*;
+import java.util.Date;
 import java.util.List;
 
 public class Server
@@ -29,13 +29,15 @@ public class Server
 	private static final String DB_USER = "root";
 	private static final String USER_PW = "root";
 
+	private static final long DROP_TIME_FACTOR = 1000 * 3600 * 24;
+
 	private static final String IMAGE_FOLDER = "imgs";
 
 	private Registry registry;
 
 	private Connection con;
 
-	private PreparedStatement addOrder, addOrderProd, removeOrder, listOrders, getOrder, listActiveOrders,
+	private PreparedStatement addOrder, addOrderProd, removeOrder, listOrders, getOrder, listActiveOrders, listSalesByDate,
 								addProduct, removeProduct, getProduct, listProducts,
 								getLocation, setLocation,
 								addUser, removeUser,  getUser;
@@ -88,20 +90,23 @@ public class Server
 	{
 		con = DriverManager.getConnection(SERVER_ACC, DB_USER, USER_PW);
 		addOrder = con.prepareStatement("INSERT INTO orders (uid) VALUES (?)", Statement.RETURN_GENERATED_KEYS);
-		addOrderProd = con.prepareStatement("INSERT INTO orderls (oid, pid, ct) VALUES (?, ?, ?)", Statement.RETURN_GENERATED_KEYS);
-		removeOrder = con.prepareStatement("DELETE FROM orders WHERE id=?", Statement.RETURN_GENERATED_KEYS);
-		listOrders = con.prepareStatement("SELECT orderls.oid, orderls.ct, product.* FROM orderls INNER JOIN product ON orderls.pid = product.pid", Statement.RETURN_GENERATED_KEYS);
-		listActiveOrders = con.prepareStatement("SELECT orderls.oid, orderls.ct, product.* FROM orderls INNER JOIN product ON orderls.pid = product.pid INNER JOIN orders ON orderls.oid = orders.oid WHERE orders.status = 'pending'", Statement.RETURN_GENERATED_KEYS);
-		getOrder = con.prepareStatement("SELECT orderls.ct, product.* FROM orderls INNER JOIN product ON orderls.pid = product.pid WHERE orderls.oid=?", Statement.RETURN_GENERATED_KEYS);
+		addOrderProd = con.prepareStatement("INSERT INTO orderls (oid, pid, ct) VALUES (?, ?, ?)");
+		removeOrder = con.prepareStatement("DELETE FROM orders WHERE id=?");
+		listOrders = con.prepareStatement("SELECT orderls.oid, orderls.ct, product.* FROM orderls INNER JOIN product ON orderls.pid = product.pid");
+		listActiveOrders = con.prepareStatement("SELECT orderls.oid, orderls.ct, product.* FROM " +
+															"orderls INNER JOIN product ON orderls.pid = product.pid INNER JOIN orders ON orderls.oid = orders.oid " +
+															"WHERE orders.status = 'pending'");
+		listSalesByDate = con.prepareStatement("SELECT orderls.pid, orderls.ct, orders.created FROM orderls INNER JOIN orders ON orderls.oid = orders.oid");
+		getOrder = con.prepareStatement("SELECT orderls.ct, product.* FROM orderls INNER JOIN product ON orderls.pid = product.pid WHERE orderls.oid=?");
 		addProduct = con.prepareStatement("INSERT INTO product (name, description, iconFile, price) VALUES (?, ?, ?, ?)", Statement.RETURN_GENERATED_KEYS);
-		removeProduct = con.prepareStatement("DELETE FROM product WHERE pid=?", Statement.RETURN_GENERATED_KEYS);
-		getProduct = con.prepareStatement("SELECT * FROM product WHERE pid=?", Statement.RETURN_GENERATED_KEYS);
-		listProducts = con.prepareStatement("SELECT * FROM product", Statement.RETURN_GENERATED_KEYS);
-		getLocation = con.prepareStatement("SELECT xcoord, ycoord FROM location WHERE pid=?", Statement.RETURN_GENERATED_KEYS);
-		setLocation = con.prepareStatement("INSERT INTO location (pid, xcoord, ycoord) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE xcoord=?, ycoord=?", Statement.RETURN_GENERATED_KEYS);
+		removeProduct = con.prepareStatement("DELETE FROM product WHERE pid=?");
+		getProduct = con.prepareStatement("SELECT * FROM product WHERE pid=?");
+		listProducts = con.prepareStatement("SELECT * FROM product");
+		getLocation = con.prepareStatement("SELECT xcoord, ycoord FROM location WHERE pid=?");
+		setLocation = con.prepareStatement("INSERT INTO location (pid, xcoord, ycoord) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE xcoord=?, ycoord=?");
 		addUser = con.prepareStatement("INSERT INTO user (name) VALUES (?)", Statement.RETURN_GENERATED_KEYS);
-		removeUser = con.prepareStatement("DELETE FROM user WHERE uid=?", Statement.RETURN_GENERATED_KEYS);
-		getUser = con.prepareStatement("SELECT * FROM user WHERE uid=?", Statement.RETURN_GENERATED_KEYS);
+		removeUser = con.prepareStatement("DELETE FROM user WHERE uid=?");
+		getUser = con.prepareStatement("SELECT * FROM user WHERE uid=?");
 	}
 
 	private void initIMG()
@@ -261,6 +266,42 @@ public class Server
 		}catch (SQLException e)
 		{
 			throw new RemoteException("Failed to retrieve orders", e);
+		}
+	}
+
+	@Override
+	public Map<Date, Map<Integer, Integer>> listSalesByDate() throws RemoteException {
+		try {
+			ResultSet res = listSalesByDate.executeQuery();
+
+			Map<Date, Map<Integer, Integer>> sales = new HashMap<>();
+
+			while(res.next())
+			{
+				int pid = res.getInt(1);
+				int ct = res.getInt(2);
+				Date created = res.getDate(3);
+				created = new Date(created.getYear(), created.getMonth(), created.getDate());
+
+				Map<Integer, Integer> tmp = sales.get(created);
+
+				if(tmp == null)
+				{
+					tmp = new HashMap<>();
+
+					sales.put(created, tmp);
+				}
+
+				if(tmp.containsKey(pid))
+					tmp.put(pid, tmp.get(pid) + ct);
+				else
+					tmp.put(pid, ct);
+			}
+
+			return sales;
+		}catch (SQLException e)
+		{
+			throw new RemoteException("Failed to retrieve orders by date", e);
 		}
 	}
 

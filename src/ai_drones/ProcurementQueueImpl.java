@@ -15,6 +15,7 @@ public class ProcurementQueueImpl
 	extends UnicastRemoteObject
 	implements ProcurementQueue
 {
+	public static final String QUEUE_HOST = "localhost";
 	public static final int QUEUE_PORT = 6000;
 	public static final String REG_NAME = "alimazon.procurementq";
 
@@ -30,6 +31,8 @@ public class ProcurementQueueImpl
 
 	public static void main(String[] args)
 	{
+		System.setProperty("java.rmi.server.hostname", QUEUE_HOST);
+
 		try {
 			instance = new ProcurementQueueImpl();
 
@@ -53,13 +56,6 @@ public class ProcurementQueueImpl
 		{
 			e.printStackTrace();
 		}
-
-		try{
-			Thread.sleep(1000);	// just to keep the server alive for testing
-		}catch (InterruptedException e)
-		{
-
-		}
 	}
 
 	private BlockingQueue<AIReport> q = new LinkedBlockingDeque<>();
@@ -67,7 +63,7 @@ public class ProcurementQueueImpl
 	private ProcurementQueueImpl()
 			throws RemoteException
 	{
-
+		super(QUEUE_PORT);
 	}
 
 	public void init()
