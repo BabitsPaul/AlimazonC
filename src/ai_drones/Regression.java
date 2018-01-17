@@ -3,6 +3,7 @@ package ai_drones;
 import webservices.ClientInterface;
 import webservices.ServerInterfaceBase;
 import weka.classifiers.functions.LinearRegression;
+import weka.classifiers.functions.MultilayerPerceptron;
 import weka.core.Attribute;
 import weka.core.DenseInstance;
 import weka.core.Instances;
@@ -63,6 +64,23 @@ public class Regression
 	public LinearRegression genLinearRegression(int pid)
 		throws Exception
 	{
+		LinearRegression temp = new LinearRegression();
+		temp.buildClassifier(getInstance(pid));
+
+		return temp;
+	}
+
+	public MultilayerPerceptron getNonLinearRegression(int pid)
+		throws Exception
+	{
+		MultilayerPerceptron tmp = new MultilayerPerceptron();
+		tmp.buildClassifier(getInstance(pid));
+
+		return tmp;
+	}
+
+	private Instances getInstance(int pid)
+	{
 		Instances inst;
 
 		if(data.containsKey(pid))
@@ -90,10 +108,7 @@ public class Regression
 			inst.setClass(countAttr);
 		}
 
-		LinearRegression temp = new LinearRegression();
-		temp.buildClassifier(inst);
-
-		return temp;
+		return inst;
 	}
 
 	public Set<Integer> listAvailableProductIDs()
